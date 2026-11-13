@@ -51,6 +51,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 input:hover,select:hover{border-color:#b7d6d9}
 input:focus,select:focus{outline:0;border-color:var(--c4);background:#fff;box-shadow:0 0 0 4px rgba(0,207,207,.16)}
 .fld.bad input,.fld.bad select{border-color:var(--err);box-shadow:0 0 0 4px rgba(179,56,44,.08)}
+.hintt{font-size:12px;color:var(--mut);line-height:1.4}
 .err{font-size:12px;color:var(--err);min-height:0;display:none}
 .fld.bad .err{display:block}
 .chips{display:flex;flex-wrap:wrap;gap:10px}
@@ -158,21 +159,21 @@ const SECTIONS=[
  {k:'civil',label:'Estado civil',entry:730384410,type:'radio',options:['Solteiro','Casado','Divorciado','Separado','Outro'],full:true}
 ]},
 {id:'res',title:'Endereço residencial',sub:'Onde você mora',fields:[
+ {k:'resCep',label:'CEP',entry:928644208,type:'text',mask:'cep',im:'numeric',ac:'postal-code',hint:'Digite o CEP e preenchemos o endereço para você.'},
  {k:'resEnd',label:'Endereço residencial',entry:743474645,type:'text',full:true,ac:'street-address'},
  {k:'resNum',label:'Nº',entry:439034333,type:'text'},
- {k:'resCep',label:'CEP',entry:928644208,type:'text',mask:'cep',im:'numeric',ac:'postal-code'},
  {k:'resBairro',label:'Bairro',entry:1849827013,type:'text'},
- {k:'resCidade',label:'Cidade',entry:1616386713,type:'text',ac:'address-level2'}
+ {k:'resCidade',label:'Cidade',entry:1616386713,type:'text',ac:'address-level2',full:true}
 ]},
 {id:'prof',title:'Dados profissionais',sub:'Ocupação, renda e endereço comercial',fields:[
  {k:'prof',label:'Profissão',entry:759451416,type:'text'},
  {k:'empresa',label:'Nome da empresa',entry:105386551,type:'text'},
  {k:'renda',label:'Renda',entry:1779606986,type:'text',mask:'money',im:'numeric'},
+ {k:'comCep',label:'CEP comercial',entry:1399863979,type:'text',mask:'cep',im:'numeric',hint:'Digite o CEP e preenchemos o endereço para você.'},
  {k:'comEnd',label:'Endereço comercial',entry:1847252539,type:'text',full:true},
  {k:'comNum',label:'Nº',entry:2137208044,type:'text'},
- {k:'comCep',label:'CEP',entry:1399863979,type:'text',mask:'cep',im:'numeric'},
  {k:'comBairro',label:'Bairro',entry:1321014259,type:'text'},
- {k:'comCidade',label:'Cidade',entry:1879552098,type:'text'}
+ {k:'comCidade',label:'Cidade',entry:1879552098,type:'text',full:true}
 ]},
 {id:'conj',title:'Informações do cônjuge',sub:'Preencha os dados do(a) cônjuge',cond:true,fields:[
  {k:'regime',label:'Regime de casamento',entry:1783220736,type:'select',options:REGIMES,full:true},
@@ -224,6 +225,7 @@ function render(){
     if(fd.mask==='uf')inp.maxLength=2;
     w.append(inp);
    }
+   if(fd.hint)w.append(el('div','hintt',fd.hint));
    w.append(el('div','err'));
    g.append(w);
   });
@@ -385,6 +387,21 @@ async function onSubmit(e){
  catch(err){b.disabled=false;b.textContent='Enviar cadastro';const s=$('#slot');s.replaceChildren(el('div','banner warn','Não foi possível confirmar o envio. Verifique sua conexão e tente novamente.'))}
 }
 render();progress();FORM().addEventListener('submit',onSubmit);
+const CEPMAP={resCep:{end:'resEnd',bairro:'resBairro',cidade:'resCidade',num:'resNum'},comCep:{end:'comEnd',bairro:'comBairro',cidade:'comCidade',num:'comNum'}};
+const cepLast={};
+FORM().addEventListener('input',async e=>{
+ const n=e.target&&e.target.name,m=CEPMAP[n];if(!m)return;
+ const c=digits(e.target.value);if(c.length!==8){cepLast[n]=null;return}
+ if(cepLast[n]===c)return;cepLast[n]=c;
+ const w=e.target.closest('.fld');
+ try{
+  const r=await fetch('https://viacep.com.br/ws/'+c+'/json/');const j=await r.json();
+  if(j.erro){w.classList.add('bad');w.querySelector('.err').textContent='CEP não encontrado. Preencha o endereço manualmente.';return}
+  const set=(k,v)=>{const i=FORM().querySelector('[name="'+k+'"]');if(i&&v){i.value=v;i.closest('.fld').classList.remove('bad')}};
+  set(m.end,j.logradouro);set(m.bairro,j.bairro);set(m.cidade,j.localidade);
+  progress();const nn=FORM().querySelector('[name="'+m.num+'"]');if(nn)nn.focus();
+ }catch(_){}
+});
 
 </script>
 </body>
